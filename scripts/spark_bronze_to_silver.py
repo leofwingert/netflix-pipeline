@@ -4,8 +4,28 @@ from pyspark.sql.functions import col, regexp_extract, when, to_timestamp, coale
 
 def main():
     # 1. Iniciar SparkSession
+    # Conector GCS (instalado no Dockerfile) + autenticação via service account
+    gcs_jar = os.getenv("GCS_CONNECTOR_JAR", "/opt/spark-jars/gcs-connector.jar")
+    keyfile = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+
     spark = SparkSession.builder \
         .appName("NetflixDataLakeBronzeToSilver") \
+        .master("local[1]") \
+        .config("spark.driver.memory", "512m") \
+        .config("spark.driver.memoryOverhead", "128m") \
+        .config("spark.driver.extraJavaOptions", "-XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -Xss512k") \
+        .config("spark.hadoop.fs.gs.outputstream.upload.chunk.size", "8388608") \
+        .config("spark.hadoop.fs.gs.inputstream.min.range.request.size", "1048576") \
+        .config("spark.sql.parquet.compression.codec", "snappy") \
+        .config("spark.hadoop.parquet.block.size", "33554432") \
+        .config("spark.sql.shuffle.partitions", "4") \
+        .config("spark.sql.files.maxPartitionBytes", "64m") \
+        .config("spark.ui.enabled", "false") \
+        .config("spark.jars", gcs_jar) \
+        .config("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem") \
+        .config("spark.hadoop.fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS") \
+        .config("spark.hadoop.google.cloud.auth.service.account.enable", "true") \
+        .config("spark.hadoop.google.cloud.auth.service.account.json.keyfile", keyfile) \
         .getOrCreate()
 
     # Caminhos no bucket (ajuste o nome do bucket se necessário)
@@ -28,12 +48,12 @@ def main():
     print("Processando avaliações (ratings)...")
     # 3. Leitura e Limpeza de Ratings (Histórico + Adicional)
     df_ratings_1 = spark.read.option("header", "true").csv(f"{BUCKET}/bronze/user_rating_history.csv")
-    df_ratings_2 = spark.read.option("header", "true").csv(f"{BUCKET}/bronze/user_additional_rating.csv")
+    df_ratings_2 = spark.read.option("header", "true").csv(f"{BUCKET}/bronze/ratings_for_additional_users.csv")
     
     # Une os dois datasets
     df_ratings_raw = df_ratings_1.unionByName(df_ratings_2)
 
-    # Tratamento de NAs, conversão numérica e data
+    # Tratamento de NAs, conversão numérica e data (coluna original: tstamp)
     df_ratings_clean = df_ratings_raw \
         .withColumn("user_id", col("userId").cast("long")) \
         .withColumn("movie_id", col("movieId").cast("long")) \
@@ -41,8 +61,8 @@ def main():
         .withColumn(
             "rating_ts",
             coalesce(
-                to_timestamp(col("timestamp"), "yyyy-MM-dd HH:mm:ss"),
-                to_timestamp(col("timestamp").cast("long"))
+                to_timestamp(col("tstamp"), "yyyy-MM-dd HH:mm:ss"),
+                to_timestamp(col("tstamp").cast("long"))
             )
         ) \
         .filter(

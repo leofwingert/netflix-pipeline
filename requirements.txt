@@ -1,0 +1,11 @@
+# Conectores e Provedores GCP para Airflow
+apache-airflow-providers-google>=10.15.0
+google-cloud-storage>=2.14.0
+google-cloud-bigquery>=3.17.0
+
+# Processamento Big Data
+pyspark>=3.5.0
+
+# Suporte a leitura/escrita de arquivos Parquet e manipulação
+pyarrow>=15.0.0
+pandas>=2.2.0
