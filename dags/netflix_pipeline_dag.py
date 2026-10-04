@@ -1,12 +1,14 @@
+import os
 from datetime import datetime
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.operators.empty import EmptyOperator
 from airflow.providers.google.cloud.operators.bigquery import BigQueryInsertJobOperator
 
-PROJECT_ID = "iconic-era-510313-m5"
-DATASET_GOLD = "netflix_analitical"
-BUCKET = "gs://leofwingert-netflix-bucket"
+PROJECT_ID = os.getenv("GCP_PROJECT_ID")
+DATASET_GOLD = os.getenv("GCP_DATASET_GOLD", "netflix_analitical")
+bucket_env = os.getenv("GCP_BUCKET_NAME", "")
+BUCKET = bucket_env if bucket_env.startswith("gs://") else f"gs://{bucket_env}"
 
 default_args = {
     'owner': 'data_engineer',
@@ -15,7 +17,6 @@ default_args = {
 
 def run_pyspark_bronze_to_silver():
     import sys
-    import os
     scripts_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "scripts"))
     for path in ["/opt/airflow/scripts", scripts_path]:
         if path not in sys.path:
@@ -68,7 +69,7 @@ with DAG(
         },
     )
 
-    # 3. Atualiza as Views Analíticas para o Metabase
+    # 3. Atualiza as Views Analíticas para o Dashboard (Streamlit)
     sql_refresh_views = f"""
     CREATE OR REPLACE VIEW `{PROJECT_ID}.{DATASET_GOLD}.vw_top_movies` AS
     SELECT
@@ -85,7 +86,7 @@ with DAG(
     """
 
     task_refresh_views = BigQueryInsertJobOperator(
-        task_id="refresh_metabase_views",
+        task_id="refresh_analytical_views",
         configuration={
             "query": {
                 "query": sql_refresh_views,

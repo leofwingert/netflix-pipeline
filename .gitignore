@@ -1,5 +1,10 @@
-/config
-*.env
+/config/
+.env
+.env.*
+!.env.example
 logs/
 __pycache__/
+*.pyc
+venv/
+.vscode/
 *.pyc

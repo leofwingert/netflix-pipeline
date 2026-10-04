@@ -6,31 +6,34 @@ x-airflow-common: &airflow-common
     postgres:
       condition: service_healthy
   environment:
-    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${POSTGRES_USER:-airflow}:${POSTGRES_PASSWORD:-airflow}@postgres/${POSTGRES_DB:-airflow}
     - AIRFLOW__CORE__EXECUTOR=LocalExecutor
     - AIRFLOW__CORE__LOAD_EXAMPLES=False
     - AIRFLOW__WEBSERVER__WORKERS=1
     - AIRFLOW__SCHEDULER__PARSING_PROCESSES=1
-    # Mesma secret_key no webserver e no scheduler (corrige o 403 ao ler logs na UI)
-    - AIRFLOW__WEBSERVER__SECRET_KEY=netflix-pipeline-local-secret
-    - GOOGLE_APPLICATION_CREDENTIALS=/opt/airflow/config/iconic-era-510313-m5-e68d937f2679.json
+    - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_WEBSERVER_SECRET_KEY:-netflix-pipeline-local-secret}
+    - GOOGLE_APPLICATION_CREDENTIALS=/opt/airflow/config/${GCP_CREDENTIALS_FILE:-google_credentials.json}
+    - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+    - GCP_DATASET_GOLD=${GCP_DATASET_GOLD:-netflix_analitical}
+    - GCP_BUCKET_NAME=${GCP_BUCKET_NAME}
+    - 'AIRFLOW_CONN_GOOGLE_CLOUD_DEFAULT={"conn_type": "google_cloud_platform", "extra": {"key_path": "/opt/airflow/config/${GCP_CREDENTIALS_FILE:-google_credentials.json}", "project": "${GCP_PROJECT_ID}"}}'
   volumes:
     - ./dags:/opt/airflow/dags
     - ./scripts:/opt/airflow/scripts
     - ./config:/opt/airflow/config
-    - ./logs:/opt/airflow/logs
+    - airflow-logs:/opt/airflow/logs
 
 services:
   postgres:
     image: postgres:15-alpine
     environment:
-      - POSTGRES_USER=airflow
-      - POSTGRES_PASSWORD=airflow
-      - POSTGRES_DB=airflow
+      - POSTGRES_USER=${POSTGRES_USER:-airflow}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-airflow}
+      - POSTGRES_DB=${POSTGRES_DB:-airflow}
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-airflow}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -41,12 +44,30 @@ services:
       - "8080:8080"
     command: >
       bash -c "airflow db migrate &&
-               airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin &&
+               airflow users create --username ${AIRFLOW_ADMIN_USER:-admin} --firstname Admin --lastname User --role Admin --email ${AIRFLOW_ADMIN_EMAIL:-admin@example.com} --password ${AIRFLOW_ADMIN_PASSWORD:-admin} &&
                airflow webserver"
 
   airflow-scheduler:
     <<: *airflow-common
     command: airflow scheduler
 
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: netflix-dashboard
+    ports:
+      - "8501:8501"
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/config/${GCP_CREDENTIALS_FILE:-google_credentials.json}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - GCP_DATASET_GOLD=${GCP_DATASET_GOLD:-netflix_analitical}
+      - GCP_BUCKET_NAME=${GCP_BUCKET_NAME}
+    volumes:
+      - ./app.py:/app/app.py
+      - ./config:/app/config:ro
+    restart: unless-stopped
+
 volumes:
   postgres-db-volume:
+  airflow-logs:

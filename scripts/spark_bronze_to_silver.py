@@ -6,21 +6,12 @@ def main():
     # 1. Iniciar SparkSession
     # Conector GCS (instalado no Dockerfile) + autenticação via service account
     gcs_jar = os.getenv("GCS_CONNECTOR_JAR", "/opt/spark-jars/gcs-connector.jar")
-    keyfile = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    keyfile = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "/opt/airflow/config/google_credentials.json")
 
     spark = SparkSession.builder \
         .appName("NetflixDataLakeBronzeToSilver") \
-        .master("local[1]") \
-        .config("spark.driver.memory", "512m") \
-        .config("spark.driver.memoryOverhead", "128m") \
-        .config("spark.driver.extraJavaOptions", "-XX:MaxMetaspaceSize=128m -XX:+UseSerialGC -Xss512k") \
-        .config("spark.hadoop.fs.gs.outputstream.upload.chunk.size", "8388608") \
-        .config("spark.hadoop.fs.gs.inputstream.min.range.request.size", "1048576") \
-        .config("spark.sql.parquet.compression.codec", "snappy") \
-        .config("spark.hadoop.parquet.block.size", "33554432") \
-        .config("spark.sql.shuffle.partitions", "4") \
-        .config("spark.sql.files.maxPartitionBytes", "64m") \
-        .config("spark.ui.enabled", "false") \
+        .master("local[*]") \
+        .config("spark.driver.memory", "2g") \
         .config("spark.jars", gcs_jar) \
         .config("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem") \
         .config("spark.hadoop.fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS") \
@@ -28,8 +19,9 @@ def main():
         .config("spark.hadoop.google.cloud.auth.service.account.json.keyfile", keyfile) \
         .getOrCreate()
 
-    # Caminhos no bucket (ajuste o nome do bucket se necessário)
-    BUCKET = "gs://leofwingert-netflix-bucket"
+    # Caminhos no bucket (definido via variável de ambiente)
+    bucket_env = os.getenv("GCP_BUCKET_NAME", "")
+    BUCKET = bucket_env if bucket_env.startswith("gs://") else f"gs://{bucket_env}"
     
     print("Processando movies.csv...")
     # 2. Leitura e Limpeza de Filmes
