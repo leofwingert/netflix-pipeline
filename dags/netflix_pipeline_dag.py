@@ -33,21 +33,11 @@ with DAG(
     tags=["pyspark", "bigquery", "docker"],
 ) as dag:
 
-    # 1. Executa a limpeza e transformação Bronze -> Silver com PySpark
+    # Executa a limpeza e transformação Bronze -> Silver com PySpark
     task_pyspark_clean = PythonOperator(
         task_id="pyspark_bronze_to_silver",
         python_callable=run_pyspark_bronze_to_silver,
     )
-
-    # 2. Carrega Silver Parquet direto no BigQuery (dim_movies)
-    sql_load_dim_movies = f"""
-    CREATE OR REPLACE TABLE `{PROJECT_ID}.{DATASET_GOLD}.dim_movies` AS
-    SELECT * FROM EXTERNAL_OBJECT_TRANSFORM(
-      TABLE `{PROJECT_ID}.{DATASET_GOLD}.dim_movies_external`
-    );
-    """
-    
-    # Ou lendo diretamente os arquivos Parquet gerados pelo PySpark:
     sql_create_fact_ratings = f"""
     CREATE OR REPLACE EXTERNAL TABLE `{PROJECT_ID}.{DATASET_GOLD}.ext_silver_ratings`
     OPTIONS (
@@ -69,7 +59,7 @@ with DAG(
         },
     )
 
-    # 3. Atualiza as Views Analíticas para o Dashboard (Streamlit)
+    # Atualiza as Views Analíticas para o Dashboard (Streamlit)
     sql_refresh_views = f"""
     CREATE OR REPLACE VIEW `{PROJECT_ID}.{DATASET_GOLD}.vw_top_movies` AS
     SELECT
