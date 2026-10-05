@@ -29,12 +29,12 @@ O pipeline resolve problemas comuns de uma rotina analítica:
 
 ### Estágios do fluxo
 
-1. **Orquestração:** o Apache Airflow agenda a DAG `netflix_elt_pyspark_pipeline` diariamente, sem `catchup`. O executor configurado é o `LocalExecutor`, com metadados armazenados em PostgreSQL.
+1. **Orquestração:** o Apache Airflow agenda a DAG `netflix_elt_pyspark_pipeline` diariamente. O executor configurado é o `LocalExecutor`, com metadados armazenados em PostgreSQL.
 2. **Bronze:** o bucket GCS deve conter os CSVs brutos em `bronze/`. O código espera `movies.csv`, `user_rating_history.csv` e `ratings_for_additional_users.csv`.
-3. **Bronze → Silver:** o PySpark lê os CSVs via conector Hadoop-GCS, normaliza IDs, converte notas e timestamps, extrai `release_year` e remove registros inválidos.
-4. **Silver:** os dados tratados são gravados no GCS em Parquet, em `silver/movies/` e `silver/ratings/`. O modo `overwrite` torna cada execução uma reconstrução completa dessas saídas.
-5. **Gold/serving:** o BigQuery expõe o Parquet de ratings por uma external table e materializa `fact_ratings`. A DAG também atualiza a view `vw_top_movies`; as demais views analíticas consumidas pelo dashboard precisam existir no dataset configurado.
-6. **Consumo:** o Streamlit consulta as views do BigQuery com cache de dados por cinco minutos e oferece filtros, KPIs, gráficos Plotly e tabelas exploráveis.
+3. **Bronze → Silver:** o PySpark lê os CSVs, normaliza IDs, converte notas e timestamps, extrai `release_year` e remove registros inválidos.
+4. **Silver:** os dados tratados são gravados no GCS em Parquet, em `silver/movies/` e `silver/ratings/`.
+5. **Gold/serving:** o BigQuery expõe o Parquet de ratings por uma external table e materializa `fact_ratings`.
+6. **Consumo:** o Streamlit consulta as views do BigQuery   e oferece filtros, KPIs, gráficos Plotly e tabelas exploráveis.
 
 O **Google Cloud Storage** funciona como Data Lake/Object Storage: mantém os arquivos brutos e tratados em um serviço escalável, enquanto o Spark executa as transformações e o BigQuery atende às consultas analíticas. Essa separação permite alterar o mecanismo de processamento sem acoplar o armazenamento ao dashboard.
 
@@ -49,32 +49,13 @@ O **Google Cloud Storage** funciona como Data Lake/Object Storage: mantém os ar
 
 ## 🛠️ Stack Tecnológica & Decisões Técnicas
 
-- **Apache Airflow 2.8.2:** agenda e encadeia as etapas do ELT com dependências explícitas.
-- **PySpark 3.5+:** executa a limpeza e transformação com uma API adequada para evolução a volumes maiores, usando `local[*]` no ambiente atual.
+- **Apache Airflow:** agenda e encadeia as etapas do ELT com dependências explícitas.
+- **PySpark:** executa a limpeza e transformação com uma API adequada para evolução a volumes maiores, usando `local[*]` no ambiente atual.
 - **Google Cloud Storage:** oferece armazenamento de objetos desacoplado do compute e suporta o acesso `gs://` pelo conector Hadoop-GCS.
 - **BigQuery:** fornece external tables, materialização de tabelas Gold e views SQL para consumo analítico.
 - **Pandas + Plotly:** convertem resultados das consultas em tabelas e visualizações interativas no dashboard.
 - **Streamlit:** entrega rapidamente uma interface analítica diretamente conectada às views do BigQuery.
 - **Docker Compose:** reproduz o ambiente com Airflow, PostgreSQL, PySpark e dashboard em serviços separados.
-
-## 📂 Estrutura do Repositório
-
-```text
-netflix-pipeline/
-├── app.py                         # Dashboard Streamlit e consultas às views Gold
-├── dags/
-│   └── netflix_pipeline_dag.py    # DAG diária e jobs BigQuery
-├── docs/
-│   └── images/                    # Evidências de execução da DAG e capturas do dashboard
-├── scripts/
-│   └── spark_bronze_to_silver.py  # Limpeza e escrita das saídas Parquet
-├── Dockerfile                     # Airflow + Java 17 + PySpark + conector GCS
-├── Dockerfile.dashboard           # Imagem independente do Streamlit
-├── docker-compose.yml             # Airflow, scheduler, PostgreSQL e dashboard
-├── requirements.txt               # Provedores GCP, BigQuery, Spark e suporte Parquet
-├── .env.example                   # Template de configuração local
-└── .gitignore                     # Exclusão de credenciais, ambiente e logs
-```
 
 ## 📊 Visualização & Insights
 
@@ -107,7 +88,7 @@ Esta seção documenta a execução real do pipeline ponta a ponta e a validaç�
 
 ### 📈 2. Camada Analítica e Visualização Interativa (Streamlit + Plotly)
 
-O dashboard interativo conecta-se diretamente às views da camada Gold no BigQuery com cache configurado (TTL de 5 minutos), permitindo filtragem dinâmica por gênero, ano de lançamento e volume de avaliações.
+O dashboard interativo conecta-se diretamente às views da camada Gold no BigQuery, permitindo filtragem dinâmica por gênero, ano de lançamento e volume de avaliações.
 
 #### KPIs Globais Consolidados
 
@@ -161,6 +142,25 @@ O dashboard interativo conecta-se diretamente às views da camada Gold no BigQue
 </p>
 </details>
 
+---
+## 📂 Estrutura do Repositório
+
+```text
+netflix-pipeline/
+├── app.py                         # Dashboard Streamlit e consultas às views Gold
+├── dags/
+│   └── netflix_pipeline_dag.py    # DAG diária e jobs BigQuery
+├── docs/
+│   └── images/                    # Evidências de execução da DAG e capturas do dashboard
+├── scripts/
+│   └── spark_bronze_to_silver.py  # Limpeza e escrita das saídas Parquet
+├── Dockerfile                     # Airflow + Java 17 + PySpark + conector GCS
+├── Dockerfile.dashboard           # Imagem independente do Streamlit
+├── docker-compose.yml             # Airflow, scheduler, PostgreSQL e dashboard
+├── requirements.txt               # Provedores GCP, BigQuery, Spark e suporte Parquet
+├── .env.example                   # Template de configuração local
+└── .gitignore                     # Exclusão de credenciais, ambiente e logs
+```
 ---
 
 ## 🚀 Como Executar Localmente
