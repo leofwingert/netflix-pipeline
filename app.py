@@ -24,7 +24,7 @@ st.markdown("""
         background: #1f1f1f;
         padding: 18px;
         border-radius: 10px;
-        border-left: 5px solid #E50914;
+        border-left: 5px solid "#3B82F6";
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
     }
     .metric-title {
@@ -127,7 +127,7 @@ if selected_genres:
 # ==========================================
 # 5. Cabeçalho e KPIs Principais
 # ==========================================
-st.title("🎬 Netflix Data Lakehouse & Analytics")
+st.title("Netflix Data Lakehouse & Analytics")
 st.caption("Visão analítica gerada via Pipeline ELT (PySpark + Google Cloud Storage + BigQuery)")
 
 col1, col2, col3, col4 = st.columns(4)
@@ -197,7 +197,7 @@ with tab_movies:
                 orientation="h",
                 text="avg_rating",
                 color="avg_rating",
-                color_continuous_scale="Reds",
+                color_continuous_scale="Blues",
                 hover_data=["genres", "total_ratings", "release_year"],
                 labels={"avg_rating": "Nota Média", "title": "Filme"}
             )
@@ -217,7 +217,7 @@ with tab_movies:
                 size="total_ratings",
                 color="avg_rating",
                 hover_name="title",
-                color_continuous_scale="Viridis",
+                color_continuous_scale="Blues",
                 labels={"total_ratings": "Volume de Avaliações (Popularidade)", "avg_rating": "Nota Média (Qualidade)"},
                 template="plotly_dark",
                 height=450
@@ -254,7 +254,7 @@ with tab_genres:
             y="genre",
             orientation="h",
             color="total_ratings",
-            color_continuous_scale="Reds",
+            color_continuous_scale="Blues",
             template="plotly_dark",
             height=450,
             labels={"total_ratings": "Total de Avaliações", "genre": "Gênero"}
@@ -271,7 +271,7 @@ with tab_genres:
             y="genre",
             orientation="h",
             color="avg_rating",
-            color_continuous_scale="Tealgrn",
+            color_continuous_scale="Greys",
             template="plotly_dark",
             height=450,
             labels={"avg_rating": "Nota Média", "genre": "Gênero"}
@@ -307,7 +307,7 @@ with tab_users:
             df_users,
             x="avg_rating",
             nbins=30,
-            color_discrete_sequence=["#E50914"],
+            color_discrete_sequence=["#3B82F6"],
             template="plotly_dark",
             labels={"avg_rating": "Nota Média dada pelo Usuário"},
             height=400

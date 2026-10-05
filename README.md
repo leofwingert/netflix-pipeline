@@ -1,8 +1,8 @@
-# Netflix End-to-End Data Pipeline com GCS, PySpark e Streamlit
+# End-to-End Data Pipeline com GCS, PySpark e Streamlit
 
 > Pipeline ELT containerizado para transformar dados de filmes e avaliações em Parquet no Google Cloud Storage, disponibilizar uma camada analítica no BigQuery e explorar os resultados em um dashboard Streamlit.
 
-## 📌 Visão Geral & Problema de Negócio
+## 📌 Visão Geral
 
 Este projeto organiza um fluxo analítico para um catálogo de filmes e seu histórico de avaliações de usuários. Os arquivos de entrada são CSVs com metadados de filmes, avaliações históricas e avaliações adicionais de usuários, em uma estrutura compatível com datasets públicos do ecossistema MovieLens.
 
@@ -67,6 +67,8 @@ netflix-pipeline/
 ├── app.py                         # Dashboard Streamlit e consultas às views Gold
 ├── dags/
 │   └── netflix_pipeline_dag.py    # DAG diária e jobs BigQuery
+├── docs/
+│   └── images/                    # Evidências de execução da DAG e capturas do dashboard
 ├── scripts/
 │   └── spark_bronze_to_silver.py  # Limpeza e escrita das saídas Parquet
 ├── Dockerfile                     # Airflow + Java 17 + PySpark + conector GCS
@@ -76,6 +78,99 @@ netflix-pipeline/
 ├── .env.example                   # Template de configuração local
 └── .gitignore                     # Exclusão de credenciais, ambiente e logs
 ```
+
+## 📊 Visualização & Insights
+
+O dashboard apresenta quatro áreas analíticas:
+
+- **Top Filmes & Qualidade:** ranking de filmes, relação entre popularidade e nota e tabela filtrável;
+- **Performance por Gênero:** volume total de avaliações e nota média por gênero;
+- **Sazonalidade de Avaliações:** série temporal mensal por ano;
+- **Perfil de Usuários:** distribuição de notas e usuários com maior atividade.
+
+Os filtros permitem restringir por gênero, intervalo de ano de lançamento e quantidade mínima de avaliações. A aplicação calcula KPIs de filmes, avaliações, nota média global e usuários ativos a partir dos dados carregados do BigQuery.
+
+## 📊 Evidências de Execução & Dashboard Analítico
+
+Esta seção documenta a execução real do pipeline ponta a ponta e a validação das camadas de dados através da orquestração no Apache Airflow e da exploração analítica no Streamlit.
+
+### ⚙️ 1. Orquestração e Processamento Ponta a Ponta (Apache Airflow)
+
+A DAG `netflix_elt_pyspark_pipeline` gerencia o fluxo de ponta a ponta, processando **mais de 6.1 milhões de registros** entre Google Cloud Storage, Apache Spark e Google BigQuery. Todas as tarefas foram concluídas com sucesso (`success`), garantindo a integridade dos dados e o cumprimento das dependências:
+
+- **`start_task`** (`EmptyOperator`): Início e gatilho do fluxo diário.
+- **`pyspark_bronze_to_silver`** (`PythonOperator`): Extração dos CSVs brutos do bucket GCS (`bronze/`), limpeza, tipagem de dados, enriquecimento com `release_year` e gravação colunar otimizada em Parquet (`silver/`).
+- **`update_fact_ratings_gold`** (`BigQueryInsertJobOperator`): Criação/atualização da tabela de fatos `fact_ratings` no BigQuery a partir dos arquivos Parquet da camada Silver.
+- **`refresh_analytical_views`** (`BigQueryInsertJobOperator`): Materialização e atualização das views analíticas que servem à camada de consumo.
+- **`end_task`** (`EmptyOperator`): Conclusão do pipeline com validação completa do fluxo.
+
+<p align="center">
+  <img src="docs/images/airflow-pipeline-success.png" alt="Grafo de execução com status de sucesso na DAG netflix_elt_pyspark_pipeline no Airflow" width="100%">
+</p>
+
+---
+
+### 📈 2. Camada Analítica e Visualização Interativa (Streamlit + Plotly)
+
+O dashboard interativo conecta-se diretamente às views da camada Gold no BigQuery com cache configurado (TTL de 5 minutos), permitindo filtragem dinâmica por gênero, ano de lançamento e volume de avaliações.
+
+#### KPIs Globais Consolidados
+
+| Total de Filmes | Total de Avaliações | Usuários Ativos |
+| :---: | :---: | :---: |
+| **115,706** | **6,195,291** | **16,908** |
+
+---
+
+#### 🖼️ Visões Analíticas Detalhadas
+
+<details open>
+<summary><b>🎬 Aba 1: Top Filmes & Qualidade</b></summary>
+<br>
+
+> **Insight:** Avaliação ponderada por volume de engajamento e exploração tabular. Permite identificar clássicos e produções mais bem avaliadas (como *Firefly*, *The Shawshank Redemption*, *Dune: Part Two*, *Parasite* e *Pulp Fiction* no topo) e avaliar a relação entre popularidade e qualidade, além de contar com explorador tabular de dados com busca e ordenação.
+
+<p align="center">
+  <img src="docs/images/dashboard-top-filmes.png" alt="Aba Top Filmes e Qualidade - Dashboard Streamlit" width="100%">
+</p>
+</details>
+
+<details>
+<summary><b>🎭 Aba 2: Performance por Gênero</b></summary>
+<br>
+
+> **Insight:** Volume de engajamento vs. nota média por categoria. Gêneros com grande apelo de público como **Drama** (liderando com quase 2.5 milhões de avaliações), **Comedy** e **Action** dominam o volume absoluto, enquanto categorias como **Film-Noir**, **IMAX** e **Crime** registram as maiores médias de avaliação da plataforma.
+
+<p align="center">
+  <img src="docs/images/dashboard-generos.png" alt="Aba Performance por Gênero - Dashboard Streamlit" width="100%">
+</p>
+</details>
+
+<details>
+<summary><b>📅 Aba 3: Sazonalidade de Avaliações</b></summary>
+<br>
+
+> **Insight:** Séries temporais de engajamento mensal ao longo dos anos. Exibe a distribuição mês a mês das avaliações para múltiplos anos históricos, evidenciando padrões de consumo sazonais e o comportamento da base ao longo do tempo.
+
+<p align="center">
+  <img src="docs/images/dashboard-sazonalidade.png" alt="Aba Sazonalidade de Avaliações - Dashboard Streamlit" width="100%">
+</p>
+</details>
+
+<details>
+<summary><b>👤 Aba 4: Perfil de Usuários</b></summary>
+<br>
+
+> **Insight:** Comportamento e distribuição da pontuação da base. O histograma revela maior densidade de avaliações concentrada na faixa de 3.5 a 4.5 estrelas, enquanto a tabela dos 10 usuários mais críticos e ativos mapeia os perfis de maior impacto volumétrico (com o principal usuário superando 111 mil filmes avaliados).
+
+<p align="center">
+  <img src="docs/images/dashboard-usuarios.png" alt="Aba Perfil de Usuários - Dashboard Streamlit" width="100%">
+</p>
+</details>
+
+---
+
+**Status:** Pipeline ELT validado e em produção local/containerizada, processando com sucesso mais de 6.1 milhões de registros entre GCS, PySpark e BigQuery, com orquestração resiliente via Airflow e visualização analítica em Streamlit.
 
 ## 🚀 Como Executar Localmente
 
@@ -180,35 +275,3 @@ O dashboard espera as views abaixo no dataset configurado:
 `vw_top_movies`, `vw_movies_kpis`, `vw_genre_performance`, `vw_ratings_heatmap` e `vw_user_summary`.
 
 Essa é uma pré-condição importante da implementação atual: a DAG cria explicitamente `fact_ratings` e `vw_top_movies`, mas não contém as definições completas de todas essas views nem executa a task de filmes definida no código SQL. Em uma implantação limpa, essas tabelas/views devem ser provisionadas antes de abrir o Streamlit.
-
-## 📊 Visualização & Insights
-
-O dashboard apresenta quatro áreas analíticas:
-
-- **Top Filmes & Qualidade:** ranking de filmes, relação entre popularidade e nota e tabela filtrável;
-- **Performance por Gênero:** volume total de avaliações e nota média por gênero;
-- **Sazonalidade de Avaliações:** série temporal mensal por ano;
-- **Perfil de Usuários:** distribuição de notas e usuários com maior atividade.
-
-Os filtros permitem restringir por gênero, intervalo de ano de lançamento e quantidade mínima de avaliações. A aplicação calcula KPIs de filmes, avaliações, nota média global e usuários ativos a partir dos dados carregados do BigQuery.
-
-### Espaço para evidências
-
-Adicione aqui capturas de tela ou um GIF do dashboard após provisionar as views do BigQuery:
-
-```text
-docs/images/dashboard-overview.png
-docs/images/dashboard-filters.gif
-```
-
-Para registrar uma execução, inclua também um trecho dos logs da task `pyspark_bronze_to_silver` e o link/identificador da execução no Airflow.
-
-## 🔮 Próximos Passos (Melhorias Futuras)
-
-1. **Orquestração e escalabilidade:** mover o processamento Spark para Dataproc/Serverless Spark e avaliar particionamento por data no Silver, mantendo o Airflow como orquestrador.
-2. **Qualidade e contratos:** adicionar testes com Great Expectations ou Soda para schema, nulidade, unicidade, faixa de ratings e volume mínimo antes de publicar a camada Gold.
-3. **Entrega contínua e observabilidade:** configurar CI/CD para lint, testes, build das imagens e deploy, além de alertas de falha, métricas de duração e lineage das tabelas/views.
-
----
-
-**Status:** protótipo funcional de pipeline ELT local/containerizado, integrado a GCS e BigQuery. A criação das views analíticas consumidas pelo dashboard deve ser tratada como etapa de provisionamento do ambiente atual.
