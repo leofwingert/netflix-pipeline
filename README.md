@@ -23,6 +23,7 @@ O pipeline resolve problemas comuns de uma rotina analítica:
 - desacoplamento entre processamento, armazenamento e visualização.
 
 ## 🏗️ Arquitetura & Fluxo de Dados
+<img width="1046" height="484" alt="image" src="https://github.com/user-attachments/assets/d8108536-50a6-4c16-8369-0a582efdbe2e" />
 
 
 
