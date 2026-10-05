@@ -47,8 +47,6 @@ O **Google Cloud Storage** funciona como Data Lake/Object Storage: mantém os ar
 | Silver | `gs://<bucket>/silver/ratings/` | Ratings válidos, unidos e tipados | Parquet |
 | Gold | BigQuery, dataset `GCP_DATASET_GOLD` | `fact_ratings`, dimensões e views analíticas | Tabelas/views BigQuery |
 
-O código não implementa Delta Lake nem particionamento explícito por coluna. A otimização observada é o uso do formato colunar Parquet; o diretório de ratings é lido pelo BigQuery com o padrão `silver/ratings/*.parquet`.
-
 ## 🛠️ Stack Tecnológica & Decisões Técnicas
 
 - **Apache Airflow 2.8.2:** agenda e encadeia as etapas do ELT com dependências explícitas.
@@ -58,7 +56,6 @@ O código não implementa Delta Lake nem particionamento explícito por coluna. 
 - **Pandas + Plotly:** convertem resultados das consultas em tabelas e visualizações interativas no dashboard.
 - **Streamlit:** entrega rapidamente uma interface analítica diretamente conectada às views do BigQuery.
 - **Docker Compose:** reproduz o ambiente com Airflow, PostgreSQL, PySpark e dashboard em serviços separados.
-- **Parquet + PyArrow:** reduzem o custo de leitura analítica em relação a CSV e preservam um formato colunar interoperável.
 
 ## 📂 Estrutura do Repositório
 
@@ -90,13 +87,11 @@ O dashboard apresenta quatro áreas analíticas:
 
 Os filtros permitem restringir por gênero, intervalo de ano de lançamento e quantidade mínima de avaliações. A aplicação calcula KPIs de filmes, avaliações, nota média global e usuários ativos a partir dos dados carregados do BigQuery.
 
-## 📊 Evidências de Execução & Dashboard Analítico
+## 📊 Evidências & Dashboard 
 
 Esta seção documenta a execução real do pipeline ponta a ponta e a validação das camadas de dados através da orquestração no Apache Airflow e da exploração analítica no Streamlit.
 
-### ⚙️ 1. Orquestração e Processamento Ponta a Ponta (Apache Airflow)
-
-A DAG `netflix_elt_pyspark_pipeline` gerencia o fluxo de ponta a ponta, processando **mais de 6.1 milhões de registros** entre Google Cloud Storage, Apache Spark e Google BigQuery. Todas as tarefas foram concluídas com sucesso (`success`), garantindo a integridade dos dados e o cumprimento das dependências:
+### ⚙️ 1. Orquestração (Apache Airflow)
 
 - **`start_task`** (`EmptyOperator`): Início e gatilho do fluxo diário.
 - **`pyspark_bronze_to_silver`** (`PythonOperator`): Extração dos CSVs brutos do bucket GCS (`bronze/`), limpeza, tipagem de dados, enriquecimento com `release_year` e gravação colunar otimizada em Parquet (`silver/`).
@@ -127,8 +122,6 @@ O dashboard interativo conecta-se diretamente às views da camada Gold no BigQue
 <details open>
 <summary><b>🎬 Aba 1: Top Filmes & Qualidade</b></summary>
 <br>
-
-> **Insight:** Avaliação ponderada por volume de engajamento e exploração tabular. Permite identificar clássicos e produções mais bem avaliadas (como *Firefly*, *The Shawshank Redemption*, *Dune: Part Two*, *Parasite* e *Pulp Fiction* no topo) e avaliar a relação entre popularidade e qualidade, além de contar com explorador tabular de dados com busca e ordenação.
 
 <p align="center">
   <img src="docs/images/dashboard-top-filmes.png" alt="Aba Top Filmes e Qualidade - Dashboard Streamlit" width="100%">
@@ -169,8 +162,6 @@ O dashboard interativo conecta-se diretamente às views da camada Gold no BigQue
 </details>
 
 ---
-
-**Status:** Pipeline ELT validado e em produção local/containerizada, processando com sucesso mais de 6.1 milhões de registros entre GCS, PySpark e BigQuery, com orquestração resiliente via Airflow e visualização analítica em Streamlit.
 
 ## 🚀 Como Executar Localmente
 
