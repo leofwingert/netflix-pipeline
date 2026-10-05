@@ -134,8 +134,14 @@ col1, col2, col3, col4 = st.columns(4)
 
 total_movies = len(df_movies_kpis)
 total_ratings = int(df_users["total_ratings"].sum()) if not df_users.empty else 0
-avg_rating_global = df_movies_kpis["avg_rating"].mean()
 total_active_users = len(df_users)
+
+# Calcula a média apenas de filmes que possuem avaliações significativas (ex: total_ratings > 0)
+valid_movies = df_movies_kpis[df_movies_kpis["total_ratings"] > 5]
+if not valid_movies.empty:
+    avg_rating_global = (valid_movies["avg_rating"] * valid_movies["total_ratings"]).sum() / valid_movies["total_ratings"].sum()
+else:
+    avg_rating_global = df_movies_kpis["avg_rating"].mean()
 
 with col1:
     st.markdown(f"""
